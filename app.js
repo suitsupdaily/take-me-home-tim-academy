@@ -956,5 +956,35 @@ $('flipCard').onclick=()=>{cardFront=!cardFront;renderFlashcard()}; $('nextCard'
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault(); deferredPrompt=e; $('installBtn').classList.remove('hidden')}); $('installBtn').onclick=async()=>{if(deferredPrompt){deferredPrompt.prompt(); deferredPrompt=null; $('installBtn').classList.add('hidden')}};
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&playing)lock()});
 if('speechSynthesis'in window){voices=speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged=()=>{voices=speechSynthesis.getVoices(); updateAudio()}}
-if('serviceWorker'in navigator) navigator.serviceWorker.register('sw.js');
+
+function showUpdateBanner(reg){
+  const banner=$('updateBanner'), btn=$('updateNow');
+  if(!banner||!btn)return;
+  banner.classList.remove('hidden');
+  btn.onclick=()=>{
+    const worker=reg.waiting||reg.installing;
+    if(worker) worker.postMessage({type:'SKIP_WAITING'});
+    banner.querySelector('span').textContent='Updating...';
+    setTimeout(()=>location.reload(),500);
+  };
+}
+if('serviceWorker'in navigator){
+  navigator.serviceWorker.register('sw.js').then(reg=>{
+    if(reg.waiting) showUpdateBanner(reg);
+    reg.addEventListener('updatefound',()=>{
+      const newWorker=reg.installing;
+      if(!newWorker)return;
+      newWorker.addEventListener('statechange',()=>{
+        if(newWorker.state==='installed' && navigator.serviceWorker.controller) showUpdateBanner(reg);
+      });
+    });
+    setInterval(()=>reg.update(), 60*60*1000);
+  });
+  let refreshing=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(refreshing)return;
+    refreshing=true;
+    location.reload();
+  });
+}
 render();
