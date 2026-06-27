@@ -35,7 +35,13 @@
         <button id="playBtn">▶ Play Podcast</button>
         <button id="pauseBtn" class="secondary">⏸ Pause</button>
         <button id="stopBtn" class="secondary">■ Stop</button>
+        <button id="backBtn" class="secondary">↩ Back</button>
+        <button id="forwardBtn" class="secondary">↪ Forward</button>
       </div>
+      <label class="voice-row">Podcast timeline
+        <input id="audioSeek" type="range" min="0" max="0" step="1" value="0">
+      </label>
+      <p id="audioStatus" class="audio-status">Ready</p>
       <label class="voice-row">Voice speed
         <input id="rate" type="range" min="0.7" max="1.25" step="0.05" value="0.95">
       </label>
