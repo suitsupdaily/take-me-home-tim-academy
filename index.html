@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Take Me Home Tim Academy</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#234f36">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="hero">
+    <div>
+      <p class="eyebrow">Iowa Real Estate Audio Academy</p>
+      <h1>Take Me Home Tim Academy</h1>
+      <p>Learn the license material like a podcast, review it like a pro, and build confidence one unit at a time.</p>
+    </div>
+  </header>
+
+  <main>
+    <section class="card progress-card">
+      <h2>Today’s Quest</h2>
+      <div class="progress-wrap"><div id="progressBar"></div></div>
+      <p id="progressText">0% complete</p>
+      <button id="resetBtn" class="ghost">Reset progress</button>
+    </section>
+
+    <section class="unit-tabs" id="unitTabs"></section>
+
+    <section class="card">
+      <p class="eyebrow" id="unitLabel">Unit 1</p>
+      <h2 id="unitTitle">Land, Real Property, and Real Estate</h2>
+      <p id="unitTheme"></p>
+      <div class="actions">
+        <button id="playBtn">▶ Play Podcast</button>
+        <button id="pauseBtn" class="secondary">⏸ Pause</button>
+        <button id="stopBtn" class="secondary">■ Stop</button>
+      </div>
+      <label class="voice-row">Voice speed
+        <input id="rate" type="range" min="0.7" max="1.25" step="0.05" value="0.95">
+      </label>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h3>Podcast Script</h3>
+        <p id="podcastText"></p>
+      </article>
+      <article class="card">
+        <h3>Cliff Notes</h3>
+        <ul id="notesList"></ul>
+      </article>
+      <article class="card">
+        <h3>Memory Tricks</h3>
+        <ul id="memoryList"></ul>
+      </article>
+      <article class="card confidence">
+        <h3>Confidence Corner</h3>
+        <p id="confidenceText"></p>
+      </article>
+    </section>
+
+    <section class="card">
+      <h2>Exam Challenge</h2>
+      <div id="quiz"></div>
+      <button id="checkQuiz">Check Answers</button>
+      <p id="quizResult"></p>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
