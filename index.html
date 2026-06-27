@@ -2,78 +2,69 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Take Me Home Tim Academy</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Take Me Home Tim Academy V5</title>
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#234f36">
+  <meta name="theme-color" content="#10251b">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="hero">
-    <div>
-      <p class="eyebrow">Iowa Real Estate Audio Academy</p>
-      <h1>Take Me Home Tim Academy</h1>
-      <p>Learn the license material like a podcast, review it like a pro, and build confidence one unit at a time.</p>
-    </div>
+  <header class="topbar">
+    <div class="brand"><div class="logo">🏡</div><div><strong>Take Me Home Tim</strong><span>Real Estate Success Platform</span></div></div>
+    <button id="installBtn" class="ghost hidden">Install</button>
   </header>
-
-  <main>
-    <section class="card progress-card">
-      <h2>Today’s Quest</h2>
-      <div class="progress-wrap"><div id="progressBar"></div></div>
-      <p id="progressText">0% complete</p>
-      <button id="resetBtn" class="ghost">Reset progress</button>
+  <main class="shell">
+    <section class="hero card">
+      <div><p class="eyebrow">Version 5</p><h1>Your Adaptive Iowa Real Estate Academy</h1><p>Podcast lessons, smart quizzes, mastery tracking, study streaks, and a daily plan that shifts based on your results.</p></div>
+      <div class="score-ring"><span id="masteryBig">0%</span><small>Mastery</small></div>
     </section>
 
-    <section class="unit-tabs" id="unitTabs"></section>
-
-    <section class="card">
-      <p class="eyebrow" id="unitLabel">Unit 1</p>
-      <h2 id="unitTitle">Land, Real Property, and Real Estate</h2>
-      <p id="unitTheme"></p>
-      <div class="actions">
-        <button id="playBtn">▶ Play Podcast</button>
-        <button id="pauseBtn" class="secondary">⏸ Pause</button>
-        <button id="stopBtn" class="secondary">■ Stop</button>
-        <button id="backBtn" class="secondary">↩ Back</button>
-        <button id="forwardBtn" class="secondary">↪ Forward</button>
-      </div>
-      <label class="voice-row">Podcast timeline
-        <input id="audioSeek" type="range" min="0" max="0" step="1" value="0">
-      </label>
-      <p id="audioStatus" class="audio-status">Ready</p>
-      <label class="voice-row">Voice speed
-        <input id="rate" type="range" min="0.7" max="1.25" step="0.05" value="0.95">
-      </label>
+    <section class="stats">
+      <article class="card"><b id="streak">0</b><span>Study streak</span></article>
+      <article class="card"><b id="xp">0</b><span>XP earned</span></article>
+      <article class="card"><b id="rank">Prospect</b><span>Current rank</span></article>
+      <article class="card"><b id="weakTopic">Start Unit 1</b><span>Focus area</span></article>
     </section>
 
-    <section class="grid">
-      <article class="card">
-        <h3>Podcast Script</h3>
-        <p id="podcastText"></p>
-      </article>
-      <article class="card">
-        <h3>Cliff Notes</h3>
-        <ul id="notesList"></ul>
-      </article>
-      <article class="card">
-        <h3>Memory Tricks</h3>
-        <ul id="memoryList"></ul>
-      </article>
-      <article class="card confidence">
-        <h3>Confidence Corner</h3>
-        <p id="confidenceText"></p>
-      </article>
-    </section>
+    <section class="layout">
+      <aside class="card sidebar">
+        <h2>Course Map</h2>
+        <div id="unitList" class="unit-list"></div>
+      </aside>
 
-    <section class="card">
-      <h2>Exam Challenge</h2>
-      <div id="quiz"></div>
-      <button id="checkQuiz">Check Answers</button>
-      <p id="quizResult"></p>
+      <section class="mainpanel">
+        <article class="card daily">
+          <p class="eyebrow">Today’s Adaptive Plan</p>
+          <h2 id="dailyTitle">Start strong</h2>
+          <p id="dailyPlan"></p>
+          <button id="startRecommended">Start Recommended Unit</button>
+        </article>
+
+        <article class="card player">
+          <p class="eyebrow" id="unitLabel">Unit</p>
+          <h2 id="unitTitle"></h2>
+          <p id="unitTheme"></p>
+          <div class="controls">
+            <button id="playBtn">▶ Play</button><button id="pauseBtn" class="secondary">⏸ Pause</button><button id="stopBtn" class="secondary">■ Stop</button>
+            <button id="backBtn" class="secondary">-15s</button><button id="forwardBtn" class="secondary">+15s</button>
+          </div>
+          <label>Lesson timeline <input id="audioSeek" type="range" min="0" max="100" value="0"></label>
+          <div class="mini"><span id="audioStatus">Ready</span><span id="voiceName"></span></div>
+          <label>Speed <input id="rate" type="range" min="0.75" max="1.5" step="0.05" value="1"></label>
+          <div class="toggles"><label><input type="checkbox" id="keepAwake" checked> Keep screen awake while playing</label><label><input type="checkbox" id="autoAdvance" checked> Auto-advance lesson sections</label></div>
+        </article>
+
+        <section class="tabs card">
+          <nav><button data-tab="lesson" class="active">Lesson</button><button data-tab="notes">Notes</button><button data-tab="flashcards">Flashcards</button><button data-tab="quiz">Quiz</button><button data-tab="coach">Coach</button></nav>
+          <div id="lesson" class="tab active"><p id="podcastText"></p></div>
+          <div id="notes" class="tab"><ul id="notesList"></ul><h3>Memory Tricks</h3><ul id="memoryList"></ul></div>
+          <div id="flashcards" class="tab"><div id="flashcard" class="flashcard"></div><button id="flipCard">Flip Card</button><button id="nextCard" class="secondary">Next</button></div>
+          <div id="quiz" class="tab"><div id="quizBox"></div><button id="checkQuiz">Check Answers</button><p id="quizResult"></p></div>
+          <div id="coach" class="tab"><h3>AI-style Coach</h3><p id="coachText"></p><button id="markComplete">Mark lesson complete</button><button id="resetBtn" class="danger">Reset all progress</button></div>
+        </section>
+      </section>
     </section>
   </main>
-
   <script src="app.js"></script>
 </body>
 </html>

@@ -918,121 +918,43 @@ const units = [
     ]
   }
 ];
-
-let current=0;
 const $=id=>document.getElementById(id);
-function save(key,val){localStorage.setItem(key,JSON.stringify(val))}
-function load(key,def){try{return JSON.parse(localStorage.getItem(key))??def}catch{return def}}
-let complete=load('tmht_complete',{});
-let audioProgress=load('tmht_audioProgress',{});
+const store=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+const read=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}};
+let state=read('tmht_v5_state',{current:0,complete:{},scores:{},xp:0,streak:0,lastStudy:null,audio:{},missed:{}});
+let current=state.current||0, voices=[], segs=[], segIndex=0, playing=false, paused=false, wakeLock=null, cardIndex=0, cardFront=true, deferredPrompt=null;
 
-let segments=[];
-let segmentIndex=0;
-let isPlaying=false;
-let isPaused=false;
-let wakeLock=null;
-let voices=[];
+function splitText(t){return t.replace(/\s+/g,' ').match(/[^.!?]+[.!?]+/g)||[t];}
+function save(){state.current=current; store('tmht_v5_state',state)}
+function today(){return new Date().toISOString().slice(0,10)}
+function touchStudy(){const t=today(); if(state.lastStudy!==t){state.streak=(state.lastStudy&&((new Date(t)-new Date(state.lastStudy))/86400000===1))?(state.streak+1):1; state.lastStudy=t;} save();}
+function unitMastery(i){const u=units[i], s=state.scores[u.label]; if(state.complete[u.label]) return 100; if(s) return Math.round((s.score/s.total)*80); return 0;}
+function overall(){return Math.round(units.reduce((a,_,i)=>a+unitMastery(i),0)/units.length)}
+function rank(xp){if(xp>2500)return'Iowa Legend'; if(xp>1800)return'Top Producer'; if(xp>1200)return'Community Builder'; if(xp>750)return'Negotiator'; if(xp>400)return'Trusted Advisor'; if(xp>150)return'Rookie Agent'; return'Prospect'}
+function recommendedIndex(){let best=0,bestVal=999; units.forEach((u,i)=>{const m=unitMastery(i); if(m<bestVal){bestVal=m;best=i}}); return best;}
+function renderStats(){const rec=recommendedIndex(); $('masteryBig').textContent=overall()+'%'; $('streak').textContent=state.streak||0; $('xp').textContent=state.xp||0; $('rank').textContent=rank(state.xp||0); $('weakTopic').textContent=units[rec].label; $('dailyTitle').textContent= overall()<10?'Begin the foundation': unitMastery(rec)<70?'Strengthen '+units[rec].label:'Keep building momentum'; $('dailyPlan').textContent=`Recommended: ${units[rec].title}. Listen to the podcast, take the quiz, and review missed questions. The app will keep steering you toward the lowest-mastery unit.`;}
+function renderList(){ $('unitList').innerHTML=units.map((u,i)=>`<button class="unit-item ${i===current?'active':''}" data-i="${i}"><span>${u.label}<br><small>${u.title}</small></span><b>${unitMastery(i)}%</b></button>`).join(''); document.querySelectorAll('.unit-item').forEach(b=>b.onclick=()=>{stop(false);current=+b.dataset.i;save();render()});}
+function renderUnit(){const u=units[current]; segs=splitText(u.podcast); segIndex=state.audio[u.label]||0; $('unitLabel').textContent=u.label; $('unitTitle').textContent=u.title; $('unitTheme').textContent=u.theme; $('podcastText').textContent=u.podcast; $('notesList').innerHTML=u.notes.map(n=>`<li>${n}</li>`).join(''); $('memoryList').innerHTML=u.memory.map(n=>`<li>${n}</li>`).join(''); renderQuiz(); renderFlashcard(); renderCoach(); updateAudio();}
+function renderQuiz(){const u=units[current]; $('quizBox').innerHTML=u.quiz.map((q,i)=>`<div class="quiz-q"><b>${i+1}. ${q.q}</b>${q.choices.map(c=>`<label><input type="radio" name="q${i}" value="${c}"> ${c}</label>`).join('')}<div id="fb${i}"></div></div>`).join(''); $('quizResult').textContent='';}
+function renderFlashcard(){const u=units[current]; const cards=[...u.notes,...u.memory]; if(!cards.length)return; cardIndex%=cards.length; $('flashcard').textContent=cardFront?`Prompt: ${u.title}`:cards[cardIndex];}
+function renderCoach(){const u=units[current], s=state.scores[u.label]; let msg=s?`Last quiz: ${s.score}/${s.total}. `:'No quiz attempt yet. '; if(s&&s.score<s.total) msg+='Your missed-answer tracker will push this unit back into your recommended plan. Review the notes, then retake it.'; else if(s) msg+='Strong work. Mark it complete and move forward.'; else msg+='Listen once, then take the quiz without peeking. Confidence comes from reps.'; $('coachText').textContent=msg;}
+function render(){renderStats();renderList();renderUnit();save()}
 
-function splitIntoSegments(text){
-  return text.replace(/\n+/g,' ').match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map(s=>s.trim()).filter(Boolean) || [text];
-}
+async function lock(){try{if($('keepAwake').checked&&'wakeLock'in navigator&&!wakeLock)wakeLock=await navigator.wakeLock.request('screen')}catch(e){}}
+async function unlock(){try{if(wakeLock){await wakeLock.release();wakeLock=null}}catch(e){}}
+function updateAudio(){const u=units[current]; const max=Math.max(segs.length-1,0); $('audioSeek').max=max; $('audioSeek').value=Math.min(segIndex,max); const pct=segs.length?Math.round((segIndex/segs.length)*100):0; $('audioStatus').textContent=playing?`Playing section ${segIndex+1}/${segs.length}`:paused?`Paused at ${segIndex+1}/${segs.length}`:`Ready at ${segIndex+1}/${segs.length} (${pct}%)`; $('playBtn').textContent=paused?'▶ Resume':'▶ Play'; const v=voices.find(v=>/Google|Natural|English|US/i.test(v.name)); $('voiceName').textContent=v?`Voice: ${v.name}`:'Voice: device default'; state.audio[u.label]=segIndex; save();}
+function speakAt(i=segIndex){if(!('speechSynthesis'in window)){alert('Speech playback is not supported on this browser.');return} speechSynthesis.cancel(); segIndex=Math.max(0,Math.min(i,segs.length-1)); playing=true; paused=false; touchStudy(); lock(); updateAudio(); speakOne();}
+function speakOne(){if(!playing||paused)return; const u=new SpeechSynthesisUtterance(segs[segIndex]); u.rate=+$('rate').value; const pref=voices.find(v=>/Google|Natural|English|US/i.test(v.name)); if(pref)u.voice=pref; u.onend=()=>{if(!playing||paused)return; if($('autoAdvance').checked && segIndex<segs.length-1){segIndex++; updateAudio(); setTimeout(speakOne,80)} else {playing=false; paused=false; if(segIndex>=segs.length-1){state.complete[units[current].label]=true; state.xp=(state.xp||0)+25; touchStudy()} updateAudio(); renderStats(); renderList(); unlock();}}; u.onerror=()=>{playing=false; updateAudio(); unlock()}; speechSynthesis.speak(u)}
+function pause(){if(playing){speechSynthesis.cancel(); playing=false; paused=true; updateAudio(); unlock()} else if(paused) speakAt(segIndex)}
+function stop(reset=true){if('speechSynthesis'in window)speechSynthesis.cancel(); playing=false; paused=false; if(reset)segIndex=0; updateAudio(); unlock()}
 
-function render(){
-  stopAudio(false);
-  const u=units[current];
-  $('unitLabel').textContent=u.label;$('unitTitle').textContent=u.title;$('unitTheme').textContent=u.theme;$('podcastText').textContent=u.podcast;
-  $('notesList').innerHTML=u.notes.map(x=>`<li>${x}</li>`).join(''); $('memoryList').innerHTML=u.memory.map(x=>`<li>${x}</li>`).join(''); $('confidenceText').textContent=u.confidence;
-  $('quiz').innerHTML=u.quiz.length?u.quiz.map((qq,i)=>`<div class="question"><strong>${i+1}. ${qq.q}</strong>${qq.choices.map(c=>`<label><input type="radio" name="q${i}" value="${c}"> ${c}</label>`).join('')}</div>`).join(''):'<p>Quiz coming soon.</p>';
-  $('quizResult').textContent='';
-  segments=splitIntoSegments(u.podcast);
-  segmentIndex=audioProgress[u.label] || 0;
-  if(segmentIndex>=segments.length) segmentIndex=0;
-  setupScrubber();
-  updateAudioUI();
-  updateProgress();
-}
-
-function updateProgress(){let pct=Math.round(Object.keys(complete).filter(k=>complete[k]).length/units.length*100);$('progressBar').style.width=pct+'%';$('progressText').textContent=pct+'% complete';}
-function setupScrubber(){ $('audioSeek').max=Math.max(segments.length-1,0); $('audioSeek').value=segmentIndex; }
-function updateAudioUI(){
-  const pct=segments.length ? Math.round((segmentIndex/segments.length)*100) : 0;
-  $('audioSeek').value=Math.min(segmentIndex, Math.max(segments.length-1,0));
-  $('audioStatus').textContent = isPlaying ? `Playing ${Math.min(segmentIndex+1,segments.length)} of ${segments.length} (${pct}%)` : isPaused ? `Paused at ${Math.min(segmentIndex+1,segments.length)} of ${segments.length}` : `Ready at ${Math.min(segmentIndex+1,segments.length)} of ${segments.length}`;
-  $('playBtn').textContent = isPaused ? '▶ Resume Podcast' : '▶ Play Podcast';
-  $('pauseBtn').textContent = isPaused ? '▶ Resume' : '⏸ Pause';
-}
-
-async function requestWakeLock(){
-  try{
-    if('wakeLock' in navigator && !wakeLock){
-      wakeLock = await navigator.wakeLock.request('screen');
-      wakeLock.addEventListener('release',()=>wakeLock=null);
-    }
-  }catch(e){ /* Some browsers block wake lock. Audio still works; screen may sleep. */ }
-}
-async function releaseWakeLock(){ try{ if(wakeLock){ await wakeLock.release(); wakeLock=null; } }catch(e){} }
-
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && isPlaying) requestWakeLock(); });
-
-function speakFrom(index=segmentIndex){
-  speechSynthesis.cancel();
-  if(index<0) index=0;
-  if(index>=segments.length) index=0;
-  segmentIndex=index;
-  isPlaying=true; isPaused=false;
-  audioProgress[units[current].label]=segmentIndex; save('tmht_audioProgress',audioProgress);
-  requestWakeLock();
-  speakCurrentSegment();
-}
-
-function speakCurrentSegment(){
-  if(!isPlaying || isPaused) return;
-  if(segmentIndex>=segments.length){
-    complete[units[current].label]=true; save('tmht_complete',complete); updateProgress();
-    audioProgress[units[current].label]=0; save('tmht_audioProgress',audioProgress);
-    isPlaying=false; isPaused=false; segmentIndex=0; updateAudioUI(); releaseWakeLock(); return;
-  }
-  updateAudioUI();
-  const utter=new SpeechSynthesisUtterance(segments[segmentIndex]);
-  utter.rate=parseFloat($('rate').value); utter.pitch=1;
-  const preferred=voices.find(v=>/Google|English|US/i.test(v.name));
-  if(preferred) utter.voice=preferred;
-  utter.onend=()=>{
-    if(!isPlaying || isPaused) return;
-    segmentIndex++;
-    audioProgress[units[current].label]=segmentIndex; save('tmht_audioProgress',audioProgress);
-    setTimeout(speakCurrentSegment, 120);
-  };
-  utter.onerror=()=>{ isPlaying=false; updateAudioUI(); releaseWakeLock(); };
-  speechSynthesis.speak(utter);
-}
-
-function pauseAudio(){
-  if(!isPlaying && isPaused){ speakFrom(segmentIndex); return; }
-  if(isPlaying){
-    speechSynthesis.cancel(); // More reliable on Android than speechSynthesis.pause().
-    isPlaying=false; isPaused=true;
-    audioProgress[units[current].label]=segmentIndex; save('tmht_audioProgress',audioProgress);
-    updateAudioUI(); releaseWakeLock();
-  }
-}
-function stopAudio(reset=true){
-  speechSynthesis.cancel(); isPlaying=false; isPaused=false; releaseWakeLock();
-  if(reset){ segmentIndex=0; audioProgress[units[current].label]=0; save('tmht_audioProgress',audioProgress); }
-  updateAudioUI();
-}
-
-$('unitTabs').innerHTML=units.map((u,i)=>`<button onclick="current=${i}; render()">${u.label}</button>`).join('');
-$('playBtn').onclick=()=> speakFrom(segmentIndex);
-$('pauseBtn').onclick=()=> pauseAudio();
-$('stopBtn').onclick=()=> stopAudio(true);
-$('backBtn').onclick=()=> speakFrom(Math.max(0,segmentIndex-1));
-$('forwardBtn').onclick=()=> speakFrom(Math.min(segments.length-1,segmentIndex+1));
-$('audioSeek').oninput=e=>{segmentIndex=parseInt(e.target.value,10)||0; audioProgress[units[current].label]=segmentIndex; save('tmht_audioProgress',audioProgress); updateAudioUI(); if(isPlaying) speakFrom(segmentIndex);};
-$('rate').oninput=()=>{ if(isPlaying) speakFrom(segmentIndex); };
-$('checkQuiz').onclick=()=>{const u=units[current]; if(!u.quiz.length)return; let score=0; u.quiz.forEach((qq,i)=>{const pick=document.querySelector(`input[name=q${i}]:checked`); if(pick&&pick.value===qq.a)score++;}); $('quizResult').textContent=`You scored ${score}/${u.quiz.length}. ${score===u.quiz.length?'Bingo. Realtor brain activated.':'Review the notes, then try again.'}`; if(score===u.quiz.length){complete[u.label]=true;save('tmht_complete',complete);updateProgress();}};
-$('resetBtn').onclick=()=>{complete={}; audioProgress={}; save('tmht_complete',complete); save('tmht_audioProgress',audioProgress); segmentIndex=0; updateProgress(); updateAudioUI();};
-
-if('speechSynthesis' in window){ voices=speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged=()=>voices=speechSynthesis.getVoices(); }
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js')}
+$('playBtn').onclick=()=>speakAt(segIndex); $('pauseBtn').onclick=pause; $('stopBtn').onclick=()=>stop(true); $('backBtn').onclick=()=>speakAt(Math.max(0,segIndex-1)); $('forwardBtn').onclick=()=>speakAt(Math.min(segs.length-1,segIndex+1)); $('audioSeek').oninput=e=>{segIndex=+e.target.value; updateAudio(); if(playing)speakAt(segIndex)}; $('rate').oninput=()=>{if(playing)speakAt(segIndex)}; $('startRecommended').onclick=()=>{stop(false);current=recommendedIndex();render();speakAt(0)};
+$('checkQuiz').onclick=()=>{const u=units[current]; let score=0; u.quiz.forEach((q,i)=>{const pick=document.querySelector(`input[name=q${i}]:checked`); const fb=$('fb'+i); if(pick&&pick.value===q.a){score++; fb.innerHTML='<span class="correct">Correct</span>'} else {fb.innerHTML=`<span class="wrong">Correct answer: ${q.a}</span>`; state.missed[u.label]=(state.missed[u.label]||0)+1;}}); state.scores[u.label]={score,total:u.quiz.length,at:Date.now()}; if(score===u.quiz.length){state.complete[u.label]=true; state.xp=(state.xp||0)+50}else{state.xp=(state.xp||0)+Math.max(5,score*10)}; touchStudy(); save(); $('quizResult').textContent=`Score: ${score}/${u.quiz.length}. ${score===u.quiz.length?'Mastery unlocked.':'This unit stays in your adaptive review path.'}`; renderStats();renderList();renderCoach();};
+$('markComplete').onclick=()=>{state.complete[units[current].label]=true; state.xp=(state.xp||0)+25; touchStudy(); save(); render()}; $('resetBtn').onclick=()=>{if(confirm('Reset all V5 progress?')){localStorage.removeItem('tmht_v5_state'); location.reload()}};
+document.querySelectorAll('.tabs nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs nav button,.tab').forEach(x=>x.classList.remove('active')); b.classList.add('active'); $(b.dataset.tab).classList.add('active')});
+$('flipCard').onclick=()=>{cardFront=!cardFront;renderFlashcard()}; $('nextCard').onclick=()=>{cardIndex++; cardFront=false; renderFlashcard()};
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault(); deferredPrompt=e; $('installBtn').classList.remove('hidden')}); $('installBtn').onclick=async()=>{if(deferredPrompt){deferredPrompt.prompt(); deferredPrompt=null; $('installBtn').classList.add('hidden')}};
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&playing)lock()});
+if('speechSynthesis'in window){voices=speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged=()=>{voices=speechSynthesis.getVoices(); updateAudio()}}
+if('serviceWorker'in navigator) navigator.serviceWorker.register('sw.js');
 render();
